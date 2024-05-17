@@ -32,32 +32,24 @@ def prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto):
     # Lista com todas as letras do alfabeto
     letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
     
-    # Função auxiliar para decidir se deve subtrair ou adicionar um valor aleatório à posição da letra na matriz de entrada
-    def decide_operation():
-        return random.choice([True, False])
-    
     # Função auxiliar para gerar um valor aleatório
     def random_value():
-        return random.randint(-100000000, 100000000)
+        return random.randint(0, 100000000)  # Alterado para gerar apenas valores positivos
     
     # Atualiza o vetor de entrada com base nas letras adivinhadas
-    for letra in letras:
-        if letra in letras_a_divinhas:
-            operation = decide_operation()
-            value = random_value()
-            if operation:
-                input_vector[letras_indices_dict[letra]] -= value
+    if letras_a_divinhas != []:
+        for letra in letras:
+            if letra in letras_a_divinhas:
+                if acerto:  # Se a letra foi adivinhada corretamente
+                    value = random_value()
+                    input_vector[letras_indices_dict[letra]] += value
+                else:  # Se a letra não foi adivinhada corretamente
+                    value = random_value()
+                    input_vector[letras_indices_dict[letra]] -= value*100
             else:
-                input_vector[letras_indices_dict[letra]] += value
-        else:
-            operation = decide_operation()
-            value = random_value()
-            if operation:
-                input_vector[letras_indices_dict[letra]] += value
-            else:
-                input_vector[letras_indices_dict[letra]] -= value
-    
-    # Imprime o vetor de entrada e retorna
+                value = random_value()
+                input_vector[letras_indices_dict[letra]] += value 
+        # Imprime o vetor de entrada e retorna
     print(input_vector)
     return input_vector
 
@@ -137,4 +129,5 @@ def main():
         print(palavra_secreta)  # Mostra a palavra secreta se o jogador perdeu todas as suas vidas
 
 # Executa a função main para iniciar o jogo
-main()
+if __name__ == "__main__":
+    main()
