@@ -2,9 +2,11 @@
 from collections import Counter
 # Importa funções úteis do PyTorch para redes neurais e operações matemáticas
 import torch.nn.functional as F
+from sklearn.feature_extraction.text import TfidfVectorizer # Transforma textos em vetores numéricos
 import torch.nn as nn
 # Importa o módulo random para geração de valores aleatórios
 import random
+import pickle
 # Importa o módulo torch para trabalhar com tensores e operações tensoriais
 import torch
 # Importa o módulo os para interagir com o sistema operacional
@@ -45,13 +47,26 @@ def prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto):
                     input_vector[letras_indices_dict[letra]] += value
                 else:  # Se a letra não foi adivinhada corretamente
                     value = random_value()
-                    input_vector[letras_indices_dict[letra]] -= value*100
+                    input_vector[letras_indices_dict[letra]] -= value*len(letras_a_divinhas)
             else:
                 value = random_value()
                 input_vector[letras_indices_dict[letra]] += value 
         # Imprime o vetor de entrada e retorna
     print(input_vector)
     return input_vector
+
+def matriz_para_letras(predicoes):
+    letras = 'abcdefghijklmnopqrstuvwxyz'
+    palavras = []
+    
+    for predicao in predicoes:
+        palavra = ''
+        for numero in predicao:
+            if numero == 1:
+                palavra += letras[len(palavra)]
+        palavras.append(palavra)
+    
+    return palavras
 
 # Função para obter uma lista de palavras de um arquivo
 def get_palavras():
@@ -60,32 +75,28 @@ def get_palavras():
         palavras = [palavra.strip().lower() for palavra in arquivo]
     return palavras
 
-# Função para calcular a frequência de cada letra em todas as palavras
-def get_frequencia_palavras():
-    palavras = get_palavras()
-    letras = ''.join(palavras)
-    frequencia = Counter(letras)
-    return frequencia
-
 # Carrega um modelo pré-treinado
-def carregar_modelo(device):
-    model_path = "hangman_model_rnn.pt"
-    model = RedeNeural(26, 26)  # Supondo que o modelo foi treinado com 26 entradas e saídas
-    model.load_state_dict(torch.load(model_path))  # Carrega os pesos do modelo
-    model.eval()  # Coloca o modelo em modo avaliação
-    model.to(device)  # Mova o modelo para o dispositivo especificado (CPU/GPU)
+def carregar_modelo(device, model):
+    if model == 0:
+        model_path = "hangman_model_rnn.pt"
+        model = RedeNeural(26, 26)  # Supondo que o modelo foi treinado com 26 entradas e saídas
+        model.load_state_dict(torch.load(model_path))  # Carrega os pesos do modelo
+        model.eval()  # Coloca o modelo em modo avaliação
+        model.to(device)  # Mova o modelo para o dispositivo especificado (CPU/GPU)
+    else:
+        filename = 'combined_model.pkl'
+        with open(filename, 'rb') as file:
+            model = pickle.load(file)
     return model
 
 # Função principal que executa o jogo
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Usa GPU se disponível, caso contrário CPU
     letras_indices_dict = {chr(i + ord('a')): i for i in range(26)}  # Dicionário para mapear letras para índices
-    model = carregar_modelo(device)  # Carrega o modelo
-    frequencia_letras = get_frequencia_palavras()  # Obtém a frequência de letras
+    modelo = int(input("1 para rnn 0 para nlp"))
+    model = carregar_modelo(device, modelo)  # Carrega o modelo
     palavras = get_palavras()  # Obtém uma lista de palavras
     palavra_secreta = random.choice(palavras)  # Seleciona uma palavra secreta aleatoriamente
-    entrada = 26  # Número de entradas para o modelo (26 letras do alfabeto)
-    letras_tens = torch.zeros(len(frequencia_letras), entrada).to(device)  # Vetor de entrada inicializado com zeros
     vidas = 6  # Número de tentativas permitidas
     palavra_desejada = "_" * len(palavra_secreta)  # Representação inicial da palavra secreta
     letras_a_divinhas = []  # Lista para armazenar as letras já adivinhadas
@@ -94,21 +105,28 @@ def main():
     # Loop principal do jogo
     while vidas >= 0:
         input("pausa")  # Espera por uma entrada do usuário antes de continuar
-        chute = prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto)  # Prepara a entrada para o modelo
-        acerto = 0  # Reinicia o contador de acertos
-        print(vidas)  # Mostra o número de vidas restantes
-        print(palavra_desejada)  # Mostra a palavra secreta atualizada
-        
-        with torch.no_grad():  # Desativa o cálculo de gradiente para a sessão de previsão
-            output = model(chute.unsqueeze(0))  # Passa a entrada através do modelo
-            _, predicted_letter_index = torch.max(output, dim=1)  # Encontra a letra prevista com maior probabilidade
-            predicted_letter_index_value = predicted_letter_index.item()  # Converte o índice da letra prevista para um valor inteiro
-        
-        for letra, valor in letras_indices_dict.items():
-            if valor == predicted_letter_index_value:
-                predicted_letter = letra  # Determina a letra prevista
-        print(predicted_letter)  # Mostra a letra prevista
-        
+        if modelo == 1: 
+            chute = prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto)  # Prepara a entrada para o modelo
+            acerto = 0  # Reinicia o contador de acertos
+            print(vidas)  # Mostra o número de vidas restantes
+            print(palavra_desejada)  # Mostra a palavra secreta atualizada
+            
+            with torch.no_grad():  # Desativa o cálculo de gradiente para a sessão de previsão
+                output = model(chute.unsqueeze(0))  # Passa a entrada através do modelo
+                _, predicted_letter_index = torch.max(output, dim=1)  # Encontra a letra prevista com maior probabilidade
+                predicted_letter_index_value = predicted_letter_index.item()  # Converte o índice da letra prevista para um valor inteiro
+            
+            for letra, valor in letras_indices_dict.items():
+                if valor == predicted_letter_index_value:
+                    predicted_letter = letra  # Determina a letra prevista
+            print(predicted_letter)  # Mostra a letra prevista
+        else:
+            novas_palavras_tokenizadas = [[letter for letter in word] for word in palavras] # Tokeniza cada palavra em letras individuais
+            texto_novas_palavras = ' '.join([''.join(word) for word in novas_palavras_tokenizadas]) # Junta todas as letras de cada palavra em uma única string, separadas por espaços
+            vectorizer = TfidfVectorizer() # Cria um objeto TfidfVectorizer para transformar o texto em vetores numéricos
+            X_novas_palavras = vectorizer.transform(texto_novas_palavras) # Transforma o texto em vetores numéricos usando TF-IDF
+            predicted = model.predict(X_novas_palavras) # Usa o modelo treinado para fazer previsões com base nos vetores numéricos
+            predicted_letter = matriz_para_letras(predicted) # Converte a matriz de previsões de volta para letras
         if predicted_letter in palavra_secreta:
             for i in range(len(palavra_secreta)):
                 if palavra_secreta[i] == predicted_letter:
