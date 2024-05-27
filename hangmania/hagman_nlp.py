@@ -2,85 +2,59 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 import pickle
 
-# Load and preprocess data
+# Função para converter palavras em características binárias
+def word_to_binary(word, alphabet):
+    return [int(letter in word) for letter in alphabet]
+
+# Ler o arquivo Excel
 df = pd.read_excel("br-sem-acentos.xlsx", engine='openpyxl')
-texto = df.iloc[:, 0].str.cat(sep=' ')
-texto_unico = df['Palavra']
 
-# Encode words using CountVectorizer
-vectorizer = CountVectorizer(analyzer='char', ngram_range=(1, 1))
-X = vectorizer.fit_transform(texto.split()).toarray()
+# Definir o alfabeto
+alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"] # Lista de todas as letras do alfabeto
 
-# Prepare labels for multi-output classification
-labels = []
-for i in range(ord('a'), ord('z') + 1):
-    letra = chr(i)
-    column_name = f'{letra}'
-    labels.append(df[column_name])
-y = np.array(labels)
+# Converter palavras em características binárias
+X = df.iloc[:, 0].apply(lambda x: word_to_binary(x.lower(), alphabet)).tolist()
 
-# Reshape y to fit the multi-output structure
-y = y.reshape(-1, 26)
+# Criar os rótulos com base nas frequências de cada letra nas palavras
+num_rows = len(df)
+print(num_rows)
+y = np.zeros((num_rows, 26))  # Matriz de zeros com num_rows linhas e 26 colunas
+for index, row in df.iterrows():
+    for letter in alphabet:
+        if letter in row['Palavra'].lower():  # Verifica se a letra está na palavra
+            y[index, alphabet.index(letter)] = 1  # Marca a coluna correspondente como 1
 
-# Split the data into training and testing sets
+print(X)
+# Dividir os dados em conjuntos de treinamento e teste
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Initialize a list to store models for each output
+# Treinar um modelo para cada saída usando LogisticRegression
 models = []
-
-# Train a model for each output using LogisticRegression
 for i in range(y_train.shape[1]):
-    print(i)
-    model = LogisticRegression(max_iter=500, random_state=42)
+    model = RandomForestClassifier(random_state=42)
     model.fit(X_train, y_train[:, i])
     models.append(model)
 
-for i, model in enumerate(models):
-    # Gerar um nome de arquivo único para cada modelo
-    filename = f'model_{chr(ord("a")+i)}.pkl'
-    print(filename)
-    # Salvar o modelo em um arquivo separado
-    with open(filename, 'wb') as file:
-        model = pickle.dump(model, file)
+# Envolver os modelos com MultiOutputClassifier
+multi_output_classifier = MultiOutputClassifier(RandomForestClassifier( random_state=42), n_jobs=-1)
+multi_output_classifier.fit(X_train, y_train)
 
-# Wrap the models with MultiOutputClassifier
-multi_output_classifier = MultiOutputClassifier(LogisticRegression(max_iter=500, random_state=42), n_jobs=len(models))
+# Fazer previsões no conjunto de teste e encontrar a letra mais provável para cada palavra
+y_pred_probabilities = multi_output_classifier.predict_proba(X_test)
 
-# Fit the classifier
-multi_output_classifier.fit(texto_unico, y)
+predicted_letters = np.argmax(y_pred_probabilities, axis=1)
+print(predicted_letters)
+print(len(predicted_letters))
+# Iterar sobre cada linha do resultado do np.argmax para extrair a letra correspondente do alfabeto
+for i in range(len(predicted_letters)):
+    print(f"Palavra: {X_test[i]}, Letra mais provável: {alphabet[predicted_letters[i][0]]}")
 
-# Save the final model
-filename = 'multi_output_logistic_regression.pkl'
+for i in range(len(predicted_letters)):
+    print(f"Palavra: {X_test[i]}, Letra mais provável: {alphabet[predicted_letters[i][1]]}")
+filename = 'multi_output_logistic_Classifier.pkl'
 with open(filename, 'wb') as file:
     pickle.dump(multi_output_classifier, file)
-# Predict on the test set
-y_pred = multi_output_classifier.predict(X_test)
-
-# Calculate the accuracy score
-print(X_test)
-print(y_pred)
-
-# Calcular a precisão para cada saída individualmente, usando zero_division=0
-precision_scores = [precision_score(y_test[:, i], y_pred[:, i], average='weighted', zero_division=0) 
-                    for i in range(y_test.shape[1])]
-
-# Calcular a recall para cada saída individualmente
-recall_scores = [recall_score(y_test[:, i], y_pred[:, i], average='weighted') for i in range(y_test.shape[1])]
-
-# Calcular a F1-score para cada saída individualmente
-f1_scores = [f1_score(y_test[:, i], y_pred[:, i], average='weighted') for i in range(y_test.shape[1])]
-
-# Calcular a média ponderada das precisões, recalls e F1-scores
-mean_precision = np.mean(precision_scores)
-mean_recall = np.mean(recall_scores)
-mean_f1 = np.mean(f1_scores)
-
-print(f"Média Ponderada da Precisão: {mean_precision}")
-print(f"Média Ponderada da Recall: {mean_recall}")
-print(f"Média Ponderada da F1-Score: {mean_f1}")
