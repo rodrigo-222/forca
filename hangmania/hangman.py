@@ -59,7 +59,8 @@ def prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto, modelo
                     value = random_value()
                     input_vector[letras_indices_dict[letra]] += value 
             # Imprime o vetor de entrada e retorna
-            return input_vector
+            print(input_vector)
+        return input_vector
     else:
         if letras_a_divinhas!= []:
             for letra in letras:
@@ -122,8 +123,7 @@ def main():
     letras = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Usa GPU se disponível, caso contrário CPU
     letras_indices_dict = {chr(i + ord('a')): i for i in range(26)}  # Dicionário para mapear letras para índices
-    #modelo = int(input("1 para rnn 0 para nlp "))
-    modelo = 0
+    modelo = int(input("1 para rnn 0 para nlp "))
     model = carregar_modelo(device, modelo)  # Carrega o modelo
     palavras = get_palavras()  # Obtém uma lista de palavras
     palavra_secreta = random.choice(palavras)  # Seleciona uma palavra secreta aleatoriamente
@@ -138,8 +138,6 @@ def main():
     while vidas >= 0:
 
         chute = prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto, modelo, letras, modelo_2)  # Prepara a entrada para o modelo
-        modelo_2 = chute
-        print(len(modelo_2))
         acerto = 0  # Reinicia o contador de acertos
         print("vidas:",vidas)  # Mostra o número de vidas restantes        
         print(palavra_desejada)  # Mostra a palavra secreta atualizada
@@ -153,11 +151,12 @@ def main():
                 if valor == predicted_letter_index_value:
                     predicted_letter = letra  # Determina a letra prevista
         else:
+            modelo_2 = chute
+            print(len(modelo_2))
             letras_a_divinhas = []
             y_pred_probabilities = model.predict_proba(chute)
             predicted_letters = np.argmax(y_pred_probabilities, axis=1)
             print("predicted_letters",predicted_letters)
-            print("tamanho predicted_letters",len(predicted_letters))
             for i in range(len(predicted_letters)):
                 print(i)
                 if predicted_letters[i][1] < len(predicted_letters) and predicted_letters[i][0] < len(predicted_letters):
