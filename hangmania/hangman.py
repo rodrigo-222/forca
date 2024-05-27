@@ -1,10 +1,7 @@
 # Importa o módulo Counter da biblioteca collections para contar frequências
-from collections import Counter
-from typing import Iterable
 import pandas as pd
 # Importa funções úteis do PyTorch para redes neurais e operações matemáticas
 import torch.nn.functional as F
-from sklearn.multioutput import MultiOutputClassifier
 import torch.nn as nn
 # Importa o módulo random para geração de valores aleatórios
 import random
@@ -13,7 +10,6 @@ import pickle
 import torch
 import numpy as np
 # Importa o módulo os para interagir com o sistema operacional
-import os
 
 # Define uma classe para a rede neural simples
 class RedeNeural(nn.Module):
