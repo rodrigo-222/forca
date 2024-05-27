@@ -43,18 +43,5 @@ for i in range(y_train.shape[1]):
 multi_output_classifier = MultiOutputClassifier(RandomForestClassifier( random_state=42), n_jobs=-1)
 multi_output_classifier.fit(X_train, y_train)
 
-# Fazer previsões no conjunto de teste e encontrar a letra mais provável para cada palavra
-y_pred_probabilities = multi_output_classifier.predict_proba(X_test)
-
-predicted_letters = np.argmax(y_pred_probabilities, axis=1)
-print(predicted_letters)
-print(len(predicted_letters))
-# Iterar sobre cada linha do resultado do np.argmax para extrair a letra correspondente do alfabeto
-for i in range(len(predicted_letters)):
-    print(f"Palavra: {X_test[i]}, Letra mais provável: {alphabet[predicted_letters[i][0]]}")
-
-for i in range(len(predicted_letters)):
-    print(f"Palavra: {X_test[i]}, Letra mais provável: {alphabet[predicted_letters[i][1]]}")
-filename = 'multi_output_logistic_Classifier.pkl'
 with open(filename, 'wb') as file:
     pickle.dump(multi_output_classifier, file)
