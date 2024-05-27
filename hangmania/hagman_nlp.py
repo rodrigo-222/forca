@@ -1,61 +1,86 @@
-# Importação das bibliotecas necessárias
-import pandas as pd  # Biblioteca para manipulação de dados
-import numpy as np  # Biblioteca para operações matemáticas
-from sklearn.feature_extraction.text import TfidfVectorizer  # Transforma textos em vetores numéricos
-from sklearn.ensemble import RandomForestClassifier  # Algoritmo de classificação Random Forest
-import pickle  # Serialização e desserialização de objetos Python
-import nltk  # Ferramenta de processamento de linguagem natural
-from nltk.tokenize import word_tokenize  # Função para dividir um texto em palavras
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import pickle
 
-# Baixando o pacote 'punkt' do NLTK, necessário para a tokenização de texto
-nltk.download('punkt')
-
-# Carregando um arquivo Excel em um DataFrame pandas
+# Load and preprocess data
 df = pd.read_excel("br-sem-acentos.xlsx", engine='openpyxl')
-
-# Concatenando todas as células da primeira coluna do DataFrame em uma única string, separando-as por espaço
 texto = df.iloc[:, 0].str.cat(sep=' ')
+texto_unico = df['Palavra']
 
-# Selecionando a coluna 'Palavra' do DataFrame
-texto_unico = df.loc[:, 'Palavra']
+# Encode words using CountVectorizer
+vectorizer = CountVectorizer(analyzer='char', ngram_range=(1, 1))
+X = vectorizer.fit_transform(texto.split()).toarray()
 
-# Convertendo a série 'texto_unico' em um DataFrame
-texto_unico_df = texto_unico.to_frame()
-
-# Inicializando uma lista vazia para armazenar os textos tokenizados
-tokenized_texts = []
-
-# Iterando sobre cada linha do DataFrame 'texto_unico_df'
-for index, row in texto_unico_df.iterrows():
-    # Tokenizando cada célula na linha atual e adicionando a linha tokenizada à lista 'tokenized_texts'
-    tokenized_row = [word_tokenize(cell, language='portuguese') for cell in row]
-    tokenized_texts.append(tokenized_row)
-
-# Convertendo a lista 'tokenized_texts' em um DataFrame
-texto_unico_tokens = pd.DataFrame(tokenized_texts)
-
-# Expandido cada lista dentro do DataFrame 'texto_unico_tokens' e empilhando os valores resultantes em uma única série
-texto_unico_tokens_flat = texto_unico_tokens.apply(pd.Series.explode).stack()
-
-# Criando um objeto TfidfVectorizer e transformando os textos tokenizados e aplanados em vetores TF-IDF
-vectorizer = TfidfVectorizer()
-texto_unico_tokens_flat_vectorizer = vectorizer.fit_transform(texto_unico_tokens_flat)
-
-# Preparando os rótulos para a classificação múltipla, selecionando cada coluna do DataFrame que começa com uma letra do alfabeto
+# Prepare labels for multi-output classification
 labels = []
 for i in range(ord('a'), ord('z') + 1):
     letra = chr(i)
     column_name = f'{letra}'
     labels.append(df[column_name])
-
-# Convertendo a lista de rótulos em um array numpy e ajustando sua forma para se adequar à estrutura de saída múltipla
 y = np.array(labels)
+
+# Reshape y to fit the multi-output structure
 y = y.reshape(-1, 26)
 
-# Criando um objeto RandomForestClassifier e treinando o modelo com os vetores TF-IDF e os rótulos
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(texto_unico_tokens_flat_vectorizer, y)
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Serializando o modelo treinado e salvando em um arquivo
-with open('modelo_random_forest.pkl', 'wb') as file:
-    pickle.dump(model, file)
+# Initialize a list to store models for each output
+models = []
+
+# Train a model for each output using LogisticRegression
+for i in range(y_train.shape[1]):
+    print(i)
+    model = LogisticRegression(max_iter=500, random_state=42)
+    model.fit(X_train, y_train[:, i])
+    models.append(model)
+
+for i, model in enumerate(models):
+    # Gerar um nome de arquivo único para cada modelo
+    filename = f'model_{chr(ord("a")+i)}.pkl'
+    print(filename)
+    # Salvar o modelo em um arquivo separado
+    with open(filename, 'wb') as file:
+        model = pickle.dump(model, file)
+
+# Wrap the models with MultiOutputClassifier
+multi_output_classifier = MultiOutputClassifier(LogisticRegression(max_iter=500, random_state=42), n_jobs=len(models))
+
+# Fit the classifier
+multi_output_classifier.fit(texto_unico, y)
+
+# Save the final model
+filename = 'multi_output_logistic_regression.pkl'
+with open(filename, 'wb') as file:
+    pickle.dump(multi_output_classifier, file)
+# Predict on the test set
+y_pred = multi_output_classifier.predict(X_test)
+
+# Calculate the accuracy score
+print(X_test)
+print(y_pred)
+
+# Calcular a precisão para cada saída individualmente, usando zero_division=0
+precision_scores = [precision_score(y_test[:, i], y_pred[:, i], average='weighted', zero_division=0) 
+                    for i in range(y_test.shape[1])]
+
+# Calcular a recall para cada saída individualmente
+recall_scores = [recall_score(y_test[:, i], y_pred[:, i], average='weighted') for i in range(y_test.shape[1])]
+
+# Calcular a F1-score para cada saída individualmente
+f1_scores = [f1_score(y_test[:, i], y_pred[:, i], average='weighted') for i in range(y_test.shape[1])]
+
+# Calcular a média ponderada das precisões, recalls e F1-scores
+mean_precision = np.mean(precision_scores)
+mean_recall = np.mean(recall_scores)
+mean_f1 = np.mean(f1_scores)
+
+print(f"Média Ponderada da Precisão: {mean_precision}")
+print(f"Média Ponderada da Recall: {mean_recall}")
+print(f"Média Ponderada da F1-Score: {mean_f1}")
