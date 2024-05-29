@@ -26,72 +26,70 @@ class RedeNeural(nn.Module):
         x = self.fc2(x)       # Passa pelo segundo layer linear
         return x              # Retorna a saída final
 
-# Função para preparar a entrada para o modelo
 def prepare_input(letras_a_divinhas, device, letras_indices_dict, acerto, modelo, letras, modelo_2):
     # Cria um vetor de zeros com tamanho 26 para representar as letras do alfabeto
+    input_vector = torch.zeros(26, device=device)  # Inicializa um tensor de zeros no dispositivo especificado (CPU/GPU)
     
+    # Função auxiliar para gerar um valor aleatório entre 0 e 100000000
     def random_value():
-        return random.randint(0, 100000000)  # Alterado para gerar apenas valores positivos
+        return random.randint(0, 100000000)  
     
-    print(modelo_2)
-    input_vector = torch.zeros(26, device=device)
-    letras_a_divinhas_modelo2 = np.zeros(26)
-    if letras_a_divinhas == []:
-        palavras = prepare_model2(letras)
-    # Lista com todas as letras do alfabeto
-    # Função auxiliar para gerar um valor aleatório
+    print(modelo_2)  # Imprime o modelo 2 para depuração
+    letras_a_divinhas_modelo2 = np.zeros(26)  # Inicializa um array numpy de zeros para armazenar as letras adivinhadas no modelo 2
+    
+    # Verifica se há alguma letra adivinhada
+    if letras_a_divinhas == []:  # Se não há letras adivinhadas, prepara o modelo 2
+        palavras = prepare_model2(letras)  # Chama a função prepare_model2 para preparar o modelo 2
+        
+    # Verifica qual modelo está sendo utilizado
     if modelo == 1:
         # Atualiza o vetor de entrada com base nas letras adivinhadas
-        if letras_a_divinhas != []:
+        if letras_a_divinhas!= []:  # Se há letras adivinhadas
             for letra in letras:
                 if letra in letras_a_divinhas:
                     if acerto:  # Se a letra foi adivinhada corretamente
-                        value = random_value()
-                        input_vector[letras_indices_dict[letra]] += value
+                        value = random_value()  # Gera um valor aleatório
+                        input_vector[letras_indices_dict[letra]] += value  # Atualiza o vetor de entrada
                     else:  # Se a letra não foi adivinhada corretamente
-                        value = random_value()
-                        input_vector[letras_indices_dict[letra]] -= value*len(letras_a_divinhas)
+                        value = random_value()  # Gera um valor aleatório
+                        input_vector[letras_indices_dict[letra]] -= value*len(letras_a_divinhas)  # Atualiza o vetor de entrada
                 else:
-                    value = random_value()
-                    input_vector[letras_indices_dict[letra]] += value 
-            # Imprime o vetor de entrada e retorna
-            print(input_vector)
+                    value = random_value()  # Gera um valor aleatório
+                    input_vector[letras_indices_dict[letra]] += value  # Atualiza o vetor de entrada
+        # Imprime o vetor de entrada e retorna
+        print(input_vector)
         return input_vector
     else:
-        if letras_a_divinhas!= []:
+        if letras_a_divinhas!= []:  # Se há letras adivinhadas
             for letra in letras:
                 if letra in letras_a_divinhas:
-                   letras_a_divinhas_modelo2[letras_indices_dict[letra]] = 1
-            print(letras_a_divinhas_modelo2)
+                   letras_a_divinhas_modelo2[letras_indices_dict[letra]] = 1  # Marca a letra como adivinhada no modelo 2
             if acerto:
-                print("entro acerto")
-                print("modelo_2", len(modelo_2))
-                vetores_filtrados = list(filter(lambda v: elementos_iguais(v, letras_a_divinhas_modelo2), modelo_2))
-                print(len(vetores_filtrados))
+                vetores_filtrados = list(filter(lambda v: elementos_iguais(v, letras_a_divinhas_modelo2), modelo_2))  # Filtra palavras baseados nas letras adivinhadas acertadas
                 return vetores_filtrados
             elif acerto == 0:
-                print("entro erro")
-                print("modelo_2")
-                vetores_filtrados = list(filter(lambda v: elementos_diferentes(v, letras_a_divinhas_modelo2), modelo_2))
-                print(len(vetores_filtrados))
+                vetores_filtrados = list(filter(lambda v: elementos_diferentes(v, letras_a_divinhas_modelo2), modelo_2))  # Filtra palavras baseados nas letras adivinhadas erradas
                 return vetores_filtrados
-        print("palavras")
-        return palavras
+        print("palavras")  # Imprime "palavras" para depuração
+        return palavras  # Retorna as palavras preparadas
     
-
+# Função auxiliar para verificar se dois vetores têm elementos iguais
 def elementos_iguais(vetor1, vetor2):
     return sum((i == j and i!= 0 and j!= 0) for i, j in zip(vetor1, vetor2)) > 0
 
+# Função auxiliar para verificar se dois vetores têm elementos diferentes
 def elementos_diferentes(vetor1, vetor2):
     return sum((i == j and i!= 0 and j!= 0) for i, j in zip(vetor1, vetor2)) == 0
 
+# Função para converter uma palavra em binário
 def word_to_binary(palavra, letras):
     return [int(letra in palavra) for letra in letras]
 
-def prepare_model2(letras):
-    df = pd.read_excel("br-sem-acentos.xlsx", engine='openpyxl')
-    X = df["Palavra"].apply(lambda x: word_to_binary(str(x).lower(), letras)).tolist()
-    return X
+
+def prepare_model2(letras):  # Define a função prepare_model2 que recebe uma lista de letras
+    df = pd.read_excel("br-sem-acentos.xlsx", engine='openpyxl')  # Lê um arquivo Excel chamado "br-sem-acentos.xlsx" usando openpyxl como motor
+    X = df["Palavra"].apply(lambda x: word_to_binary(str(x).lower(), letras)).tolist()  # Para cada palavra na coluna "Palavra" do DataFrame, converte-a para minúsculas, aplica a função word_to_binary para transformá-la em uma representação binária baseada nas letras fornecidas, e coleta todos esses vetores em uma lista
+    return X  # Retorna a lista de vetores binários
     
 # Função para obter uma lista de palavras de um arquivo
 def get_palavras():
@@ -108,11 +106,12 @@ def carregar_modelo(device, model):
         model.load_state_dict(torch.load(model_path))  # Carrega os pesos do modelo
         model.eval()  # Coloca o modelo em modo avaliação
         model.to(device)  # Mova o modelo para o dispositivo especificado (CPU/GPU)
-    else:
-        filename = 'multi_output_logistic_Classifier.pkl'
-        with open(filename, 'rb') as file:
-            model = pickle.load(file)
-    return model
+    else:  # Esta é a cláusula else de uma estrutura condicional if...else
+        filename = 'multi_output_logistic_Classifier.pkl'  # Define o nome do arquivo do modelo pré-treinado
+        with open(filename, 'rb') as file:  # Abre o arquivo especificado em modo de leitura binária ('rb')
+            model = pickle.load(file)  # Carrega o modelo pré-treinado do arquivo aberto usando a biblioteca pickle
+    return model  # Retorna o modelo carregado para ser usado posteriormente
+
 
 # Função principal que executa o jogo
 def main():
@@ -126,7 +125,7 @@ def main():
     vidas = 6  # Número de tentativas permitidas
     palavra_desejada = "_" * len(palavra_secreta)  # Representação inicial da palavra secreta
     letras_a_divinhas = []  # Lista para armazenar as letras já adivinhadas
-    while_letras_a_divinhas = []
+    while_letras_a_divinhas = [] # Lista para armazenar as letras já adivinhadas para o modelo 2
     acerto = 0
     modelo_2 = []
     
@@ -146,35 +145,35 @@ def main():
             for letra, valor in letras_indices_dict.items():
                 if valor == predicted_letter_index_value:
                     predicted_letter = letra  # Determina a letra prevista
-        else:
-            modelo_2 = chute
-            print(len(modelo_2))
-            letras_a_divinhas = []
-            y_pred_probabilities = model.predict_proba(chute)
-            predicted_letters = np.argmax(y_pred_probabilities, axis=1)
-            print("predicted_letters",predicted_letters)
-            for i in range(len(predicted_letters)):
-                print(i)
-                if predicted_letters[i][1] < len(predicted_letters) and predicted_letters[i][0] < len(predicted_letters):
-                    if letras[predicted_letters[i][0]] not in while_letras_a_divinhas:
-                        predicted_letter = letras[predicted_letters[i][0]]
-                        while_letras_a_divinhas.append(predicted_letter)
-                        break
-                    if letras[predicted_letters[i][1]] not in while_letras_a_divinhas:
-                        predicted_letter = letras[predicted_letters[i][1]]
-                        while_letras_a_divinhas.append(predicted_letter)
-                        break
-                elif predicted_letters[i][0] > len(predicted_letters):
-                    predicted_letter = letras[predicted_letters[i][1]]
-                    if predicted_letter not in while_letras_a_divinhas:
-                        while_letras_a_divinhas.append(predicted_letter)
-                        break
-                elif predicted_letters[i][1] > len(predicted_letters):
-                    predicted_letter = letras[predicted_letters[i][0]]
-                    if predicted_letter not in while_letras_a_divinhas:
-                        while_letras_a_divinhas.append(predicted_letter)
-                        break
-                    
+        else:  # Esta é a cláusula else de uma estrutura condicional if...else
+            modelo_2 = chute  # Assumindo que 'chute' seja uma variável que contém as letras previstas pelo usuário ou algum outro mecanismo
+            print(len(modelo_2))  # Imprime o número de letras previstas
+            letras_a_divinhas = []  # Inicializa uma lista vazia para armazenar as letras adivinhadas
+            y_pred_probabilities = model.predict_proba(chute)  # Usa o modelo para calcular as probabilidades de cada letra ser a resposta correta
+            predicted_letters = np.argmax(y_pred_probabilities, axis=1)  # Encontra o índice do máximo valor de probabilidade para cada letra, assumindo que isso corresponde à letra prevista
+            print("predicted_letters", predicted_letters)  # Imprime as letras previstas
+            for i in range(len(predicted_letters)):  # Itera sobre cada letra prevista
+                print(i)  # Imprime o índice da letra prevista
+                if predicted_letters[i][1] < len(predicted_letters) and predicted_letters[i][0] < len(predicted_letters):  # Verifica se ambas as letras estão dentro do intervalo válido
+                    if letras[predicted_letters[i][0]] not in while_letras_a_divinhas:  # Verifica se a primeira letra prevista ainda não foi adicionada à lista de letras adivinhadas
+                        predicted_letter = letras[predicted_letters[i][0]]  # Obtém a letra correspondente ao índice
+                        while_letras_a_divinhas.append(predicted_letter)  # Adiciona a letra à lista de letras adivinhadas
+                        break  # Sai do loop após adicionar a letra
+                    if letras[predicted_letters[i][1]] not in while_letras_a_divinhas:  # Verifica se a segunda letra prevista ainda não foi adicionada à lista de letras adivinhadas
+                        predicted_letter = letras[predicted_letters[i][1]]  # Obtém a letra correspondente ao índice
+                        while_letras_a_divinhas.append(predicted_letter)  # Adiciona a letra à lista de letras adivinhadas
+                        break  # Sai do loop após adicionar a letra
+                elif predicted_letters[i][0] > len(predicted_letters):  # Caso especial para lidar com letras previstas fora do intervalo válido
+                    predicted_letter = letras[predicted_letters[i][1]]  # Obtém a letra correspondente ao índice
+                    if predicted_letter not in while_letras_a_divinhas:  # Verifica se a letra ainda não foi adicionada à lista de letras adivinhadas
+                        while_letras_a_divinhas.append(predicted_letter)  # Adiciona a letra à lista de letras adivinhadas
+                        break  # Sai do loop após adicionar a letra
+                elif predicted_letters[i][1] > len(predicted_letters):  # Outro caso especial para lidar com letras previstas fora do intervalo válido
+                    predicted_letter = letras[predicted_letters[i][0]]  # Obtém a letra correspondente ao índice
+                    if predicted_letter not in while_letras_a_divinhas:  # Verifica se a letra ainda não foi adicionada à lista de letras adivinhadas
+                        while_letras_a_divinhas.append(predicted_letter)  # Adiciona a letra à lista de letras adivinhadas
+                        break  # Sai do loop após adicionar a letra
+          
         print("letra prevista",predicted_letter)
             
         if predicted_letter in palavra_secreta:
